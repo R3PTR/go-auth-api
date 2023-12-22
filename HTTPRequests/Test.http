@@ -1,0 +1,3 @@
+GET http://localhost:9090/test/Test
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQyMDI0NzgsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzIn0.cSBRiN9P3Ulzsmbz9GJPvT_Nmo_4Kf8Erp6nhA7RAtilch0szdyW-TNBEeTcTGBDz7oUo-O7m8FEn6_M-dmBuw

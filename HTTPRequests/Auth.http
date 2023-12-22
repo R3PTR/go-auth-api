@@ -1,0 +1,93 @@
+// Requests for /auth
+
+// Create a user
+POST http://localhost:9090/auth/createUser
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQyMjcxNjMsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzIn0.X6P3sbppaae0fRyaCcsJxwh_ECN7tEh8f3WC17wwQ8rTtrR0voEj_fFeiNa3zQweude9sohVCLMCGFYi9za5zg
+{
+    "username": "levin.backes",
+    "role": "USER"
+}
+
+###
+
+POST http://localhost:9090/auth/login
+Content-Type: application/json
+
+{
+    "username": "levin.backes",
+    "password": "XeRe7C56"
+}
+
+###
+
+POST http://localhost:9090/auth/createUser
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQyMjcxNjMsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzIn0.X6P3sbppaae0fRyaCcsJxwh_ECN7tEh8f3WC17wwQ8rTtrR0voEj_fFeiNa3zQweude9sohVCLMCGFYi9za5zg
+
+{
+    "username": "testActivate@te-autoteile.de",
+    "role": "USER"
+}
+
+###
+
+POST http://localhost:9090/auth/login
+Content-Type: application/json
+
+{
+    "username": "testActivate@te-autoteile.de",
+    "password": "NiNFOmUb"
+}
+
+###
+
+POST http://localhost:9090/auth/activateUser
+Content-Type: application/json
+
+{
+    "username": "testActivate@te-autoteile.de",
+    "oneTimePassword": "123465",
+    "newPassword": "123456"
+}
+
+###
+
+POST http://localhost:9090/auth/login
+Content-Type: application/json
+
+{
+    "username": "testActivate@te-autoteile.de",
+    "password": "123456789"
+}
+
+###
+
+POST http://localhost:9090/auth/changePassword
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQ5OTQ5MTcsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzQGdtYWlsLmNvbSJ9.j7VGGWg6rggU7piVYiNCluFAYoxYHjNilVyhHElLK-w_GhwwE3lkjS-8QIQzuJBcmHplRyeurN1k41CWqWQ5Jg
+
+{
+    "oldPassword": "XeRe7C56",
+    "newPassword": "123456"
+}
+
+###
+
+POST http://localhost:9090/auth/forgotPassword
+Content-Type: application/json
+
+{
+    "username": "testActivate@te-autoteile.de"
+}
+
+###
+
+POST http://localhost:9090/auth/resetPassword
+Content-Type: application/json
+
+{
+    "username": "testActivate@te-autoteile.de",
+    "oneTimePassword": "moinFs1U",
+    "newPassword": "123456789"
+}
