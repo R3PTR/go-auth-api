@@ -1,30 +1,33 @@
-// controllers/auth_controller.go
-package controllers
+package auth
 
 import (
 	"net/http"
 
-	"github.com/R3PTR/go-auth-api/auth"
 	"github.com/gin-gonic/gin"
 )
 
 // AuthController handles authentication-related requests
 type AuthController struct {
-	authService *auth.AuthService
+	authService *AuthService
 }
 
-func NewAuthController(authService *auth.AuthService) *AuthController {
+func NewAuthController(authService *AuthService) *AuthController {
 	return &AuthController{authService: authService}
 }
 
 // Login handles user login and issues a JWT
 func (ac *AuthController) Login(c *gin.Context) {
-	var loginRequest auth.LoginRequest
+	var loginRequest LoginRequest
 	if err := c.ShouldBindJSON(&loginRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	login, error := ac.authService.Login(loginRequest.Username, loginRequest.Password)
+	header := c.GetHeader("TOTP")
+	login, requires2FA, error := ac.authService.Login(loginRequest.Username, loginRequest.Password, header)
+	if requires2FA {
+		c.JSON(http.StatusOK, gin.H{"message": "Credentials correct", "requires_2fa": true})
+		return
+	}
 	if error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": error.Error()})
 		return
@@ -34,7 +37,7 @@ func (ac *AuthController) Login(c *gin.Context) {
 
 // CreateUser handles user creation
 func (ac *AuthController) CreateUser(c *gin.Context) {
-	var createUserRequest auth.CreateUserRequest
+	var createUserRequest CreateUserRequest
 	if err := c.ShouldBindJSON(&createUserRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -49,7 +52,7 @@ func (ac *AuthController) CreateUser(c *gin.Context) {
 
 // Activates User
 func (ac *AuthController) ActivateUser(c *gin.Context) {
-	var activeUserRequest auth.ActivateUserRequest
+	var activeUserRequest ActivateUserRequest
 	if err := c.ShouldBindJSON(&activeUserRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -59,7 +62,7 @@ func (ac *AuthController) ActivateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	user, err := user_unasserted.(auth.User)
+	user, err := user_unasserted.(User)
 	if !err {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
@@ -75,13 +78,13 @@ func (ac *AuthController) ActivateUser(c *gin.Context) {
 
 // Reset Password
 func (ac *AuthController) ResetPassword(c *gin.Context) {
-	var resetPasswordRequest auth.ResetPasswordRequest
+	var resetPasswordRequest ResetPasswordRequest
 	user_unasserted, exists := c.Get("user")
 	if !exists {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	user, err := user_unasserted.(auth.User)
+	user, err := user_unasserted.(User)
 	if !err {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
@@ -97,7 +100,7 @@ func (ac *AuthController) ResetPassword(c *gin.Context) {
 
 // Change Password
 func (ac *AuthController) ChangePassword(c *gin.Context) {
-	var changePasswordRequest auth.ChangePasswordRequest
+	var changePasswordRequest ChangePasswordRequest
 	if err := c.ShouldBindJSON(&changePasswordRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -107,7 +110,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	user, err := user_unasserted.(auth.User)
+	user, err := user_unasserted.(User)
 	if !err {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
@@ -123,7 +126,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 
 // Send Reset Password
 func (ac *AuthController) ForgotPassword(c *gin.Context) {
-	var forgotPasswordRequest auth.ForgotPasswordRequest
+	var forgotPasswordRequest ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&forgotPasswordRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -144,12 +147,22 @@ func (ac *AuthController) Logout(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	user, err := user_unasserted.(auth.User)
+	user, err := user_unasserted.(User)
 	if !err {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	error := ac.authService.Logout(user.Username)
+	token_unasserted, exists := c.Get("token")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token not found"})
+		return
+	}
+	token, err := token_unasserted.(*tokenModel)
+	if !err {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token not found"})
+		return
+	}
+	error := ac.authService.Logout(user.Username, token.Token)
 	if error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": error.Error()})
 		return
@@ -164,7 +177,7 @@ func (ac *AuthController) DeleteOwnUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	user, err := user_unasserted.(auth.User)
+	user, err := user_unasserted.(User)
 	if !err {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
@@ -179,7 +192,7 @@ func (ac *AuthController) DeleteOwnUser(c *gin.Context) {
 
 // DeleteOtherUser handles user deletion of other user
 func (ac *AuthController) DeleteOtherUser(c *gin.Context) {
-	var deleteUserRequest auth.DeleteOtherUserRequest
+	var deleteUserRequest DeleteOtherUserRequest
 	if err := c.ShouldBindJSON(&deleteUserRequest); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -190,4 +203,93 @@ func (ac *AuthController) DeleteOtherUser(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
+
+// GetTOTP
+func (ac *AuthController) GetTOTP(c *gin.Context) {
+	user_unasserted, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	user, ok := user_unasserted.(*User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	if user.TotpActive {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "TOTP already activated"})
+		return
+	}
+	otp, backupCodes, err := ac.authService.GetTOTP(user)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"otp_secret": otp.Secret(), "otp_url": otp.URL(), "backup_codes": backupCodes})
+}
+
+// ActivateTOTP
+func (ac *AuthController) ActivateTOTP(c *gin.Context) {
+	var activateTOTPRequest ActivateTOTPRequest
+	if err := c.ShouldBindJSON(&activateTOTPRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	user_unasserted, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	user, ok := user_unasserted.(*User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	err := ac.authService.ActivateTOTP(user, activateTOTPRequest.TOTP)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "TOTP activated successfully"})
+}
+
+// DeactivateTOTP
+func (ac *AuthController) DeactivateTOTP(c *gin.Context) {
+	user_unasserted, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	user, ok := user_unasserted.(*User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	err := ac.authService.DeactivateTOTP(user)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "TOTP deactivated successfully"})
+}
+
+// RegenerateBackupCodes
+func (ac *AuthController) RegenerateBackupCodes(c *gin.Context) {
+	user_unasserted, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	user, ok := user_unasserted.(*User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	backupCodes, err := ac.authService.GenerateBackupCodes(user)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"backup_codes": backupCodes})
 }

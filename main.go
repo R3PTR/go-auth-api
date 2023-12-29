@@ -9,7 +9,6 @@ import (
 
 	"github.com/R3PTR/go-auth-api/auth"
 	"github.com/R3PTR/go-auth-api/config"
-	"github.com/R3PTR/go-auth-api/controllers"
 	"github.com/R3PTR/go-auth-api/database"
 	"github.com/R3PTR/go-auth-api/emails"
 	"github.com/gin-contrib/cors"
@@ -35,10 +34,10 @@ func main() {
 	// AuthDbService
 	authDbService := auth.NewAuthDbService(mongoClient)
 	authService := auth.NewAuthService(mongoClient, config, authDbService, emailSender)
-	authController := controllers.NewAuthController(authService)
+	authController := auth.NewAuthController(authService)
 
 	// AuthMiddleware
-	authMiddleware := auth.NewMiddleware(mongoClient, authDbService)
+	authMiddleware := auth.NewMiddleware(mongoClient, authDbService, authService)
 	// Create a new router
 	router := gin.Default()
 	router.Use(cors.Default())
@@ -60,7 +59,10 @@ func main() {
 		authRouter.POST("/forgotPassword", authController.ForgotPassword)
 		authRouter.POST("/changePassword", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.ChangePassword)
 		authRouter.POST("/logout", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.Logout)
-
+		authRouter.POST("/getTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.GetTOTP)
+		authRouter.POST("/activateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.ActivateTOTP)
+		authRouter.POST("/deactivateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authMiddleware.TOTPMiddleware(), authController.DeactivateTOTP)
+		authRouter.POST("regenerateBackupCodes", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authMiddleware.TOTPMiddleware(), authController.RegenerateBackupCodes)
 	}
 	router.Run(":9090")
 }

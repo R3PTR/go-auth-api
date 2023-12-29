@@ -15,7 +15,7 @@ POST http://localhost:9090/auth/login
 Content-Type: application/json
 
 {
-    "username": "levin.backes",
+    "username": "levin.backes@gmail.com",
     "password": "XeRe7C56"
 }
 
@@ -91,3 +91,37 @@ Content-Type: application/json
     "oneTimePassword": "moinFs1U",
     "newPassword": "123456789"
 }
+
+###
+
+POST http://localhost:9090/auth/getTOTP
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDYxODQ2MTUsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzQGdtYWlsLmNvbSJ9.STHQ65s2V9GXIWP3nppPWKYp8lWTw_K0S9iUSJEMP4UUewsKmkblG_NKepdEL-IXebHvNFqLD5z13amvUz_fpQ
+
+### 
+
+POST http://localhost:9090/auth/activateTOTP
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDYxODQ2MTUsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzQGdtYWlsLmNvbSJ9.STHQ65s2V9GXIWP3nppPWKYp8lWTw_K0S9iUSJEMP4UUewsKmkblG_NKepdEL-IXebHvNFqLD5z13amvUz_fpQ
+
+{
+    "totp": "526301"
+}
+
+###
+
+POST http://localhost:9090/auth/login
+Content-Type: application/json
+TOTP: 720373
+
+{
+    "username": "levin.backes@gmail.com",
+    "password": "XeRe7C56"
+}
+
+###
+
+POST http://localhost:9090/auth/deactivateTOTP
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDYxODQ2MTUsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzQGdtYWlsLmNvbSJ9.STHQ65s2V9GXIWP3nppPWKYp8lWTw_K0S9iUSJEMP4UUewsKmkblG_NKepdEL-IXebHvNFqLD5z13amvUz_fpQ
+TOTP: SvD8srjn

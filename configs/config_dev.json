@@ -3,5 +3,6 @@
     "user_database": "development_db",
     "user_collection": "users",
     "jwt_secret": "7brG3Qf!Vc%CVC9VPaB6n$ZxRjC6oBaAiY@A%@68PNS9aWiPNHb6Rd74f5&!x3MZzXD64qpfN4jue65ivuF7P9cSjC$w!tpXqy*EuYt!SaokB^qTCUGvCQ@9qv4ht8$i",
-    "token_collection": "tokens"
+    "token_collection": "tokens",
+    "totp_issuer": "TE_Autoteile"
 }

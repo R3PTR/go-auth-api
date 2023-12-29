@@ -16,6 +16,8 @@ import (
 	"github.com/R3PTR/go-auth-api/emails"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 	"go.mongodb.org/mongo-driver/bson"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -164,7 +166,7 @@ func (a *AuthService) ChangePassword(username, oldPassword, newPassword string) 
 	if err != nil {
 		return err
 	}
-	a.AuthDbService.DeleteTokenByUsername(username)
+	a.AuthDbService.DeleteTokensByUserId(username)
 	return nil
 }
 
@@ -200,7 +202,7 @@ func (a *AuthService) ResetPassword(username, oneTimePassword, newPassword strin
 	if err != nil {
 		return err
 	}
-	a.AuthDbService.DeleteTokenByUsername(username)
+	a.AuthDbService.DeleteTokensByUserId(username)
 	return nil
 }
 
@@ -239,39 +241,51 @@ func (a *AuthService) ForgotPassword(username string) error {
 	return nil
 }
 
-func (a *AuthService) Login(username, password string) (string, error) {
+func (a *AuthService) Login(username, password, totp string) (string, bool, error) {
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return "", errors.New("Username or Password incorrect")
+		return "", false, errors.New("Username or Password incorrect")
 	}
 	if user.State != ACTIVE {
 		// User is not active
-		return "", errors.New("User is not active")
+		return "", false, errors.New("User is not active")
 	}
 	// Check if password is correct
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
 		fmt.Println(err)
-		return "", errors.New("Username or Password incorrect")
+		return "", false, errors.New("Username or Password incorrect")
+	}
+	//Check if TOTP is active
+	if user.TotpActive {
+		if totp == "" {
+			return "", true, errors.New("No TOTP provided")
+		}
+		// Check if TOTP is correct
+		valid, err := a.VerifyTOTP(user, totp)
+		if err != nil {
+			return "", true, err
+		}
+		if !valid {
+			return "", true, errors.New("TOTP is not valid")
+		}
 	}
 	// Generate JWT
 	expires := time.Now().Add(time.Hour * 720)
 	token, err := a.generateJWTToken(username, expires.Unix())
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	// Write token to database
-	err = a.AuthDbService.WriteTokenToDatabase(username, token, expires)
+	err = a.AuthDbService.WriteTokenToDatabase(user.Id, token, expires)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
-	fmt.Printf("Found user: %+v\n", user)
-	fmt.Printf("Token: %s\n", token)
-	return token, nil
+	return token, false, nil
 }
 
-func (a *AuthService) Logout(username string) error {
+func (a *AuthService) Logout(username, token string) error {
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
@@ -282,7 +296,7 @@ func (a *AuthService) Logout(username string) error {
 		return errors.New("User is not active")
 	}
 	// Delete token from database
-	err := a.AuthDbService.DeleteTokenByUsername(username)
+	err := a.AuthDbService.DeleteTokenByUserId(user.Id, token)
 	if err != nil {
 		return err
 	}
@@ -314,7 +328,7 @@ func HashPassword(password string) (string, error) {
 }
 
 func generateRandomPassword(length int) (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const charset = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ123456789"
 	var password strings.Builder
 
 	maxIndex := big.NewInt(int64(len(charset)))
@@ -329,4 +343,115 @@ func generateRandomPassword(length int) (string, error) {
 	}
 
 	return password.String(), nil
+}
+
+func (a *AuthService) GetTOTP(user *User) (*otp.Key, []string, error) {
+	issuer := a.config.TOTPIssuer
+	key, err := generateTOTPKey(user.Username, issuer)
+	if err != nil {
+	}
+	backupCodes, err := a.GenerateBackupCodes(user)
+	if err != nil {
+		return nil, nil, err
+	}
+	user.TotpSecret = key.Secret()
+	user.TotpActive = false
+	err = a.AuthDbService.UpdateUser(user)
+	if err != nil {
+		return nil, nil, err
+	}
+	return key, backupCodes, nil
+}
+
+func (a *AuthService) GenerateBackupCodes(user *User) ([]string, error) {
+	var codes []string
+	var hashed_codes []string
+	for i := 0; i < 8; i++ {
+		code, err := generateRandomPassword(8)
+		if err != nil {
+			return nil, err
+		}
+		codes = append(codes, code)
+		hashed_code, err := HashPassword(code)
+		if err != nil {
+			return nil, err
+		}
+		hashed_codes = append(hashed_codes, hashed_code)
+	}
+	user.BackupCodes = hashed_codes
+	a.AuthDbService.UpdateUser(user)
+	return codes, nil
+}
+
+func (a *AuthService) checkBackupCodes(user *User, code string) bool {
+	for _, c := range user.BackupCodes {
+		err := bcrypt.CompareHashAndPassword([]byte(c), []byte(code))
+		if err == nil {
+			// delete code from backup codes
+			var newCodes []string
+			for _, c := range user.BackupCodes {
+				hashed_code, err := HashPassword(code)
+				if err != nil {
+					return false
+				}
+				if c != hashed_code {
+					newCodes = append(newCodes, c)
+				}
+			}
+			user.BackupCodes = newCodes
+			authDbService := a.AuthDbService
+			authDbService.UpdateUser(user)
+			return true
+		}
+	}
+	return false
+}
+
+func (a *AuthService) ActivateTOTP(user *User, otp string) error {
+	valid := totp.Validate(otp, user.TotpSecret)
+	if valid {
+		user.TotpActive = true
+		err := a.AuthDbService.UpdateUser(user)
+		if err != nil {
+			return err
+		}
+		a.AuthDbService.DeleteTokensByUserId(user.Username)
+		return nil
+	}
+	return errors.New("OTP is not valid")
+}
+
+func (a *AuthService) DeactivateTOTP(user *User) error {
+	user.TotpActive = false
+	user.BackupCodes = nil
+	user.TotpSecret = ""
+	err := a.AuthDbService.UpdateUser(user)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func generateTOTPKey(accountName, issuer string) (*otp.Key, error) {
+	key, err := totp.Generate(totp.GenerateOpts{
+		Issuer:      issuer,
+		AccountName: accountName,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return key, nil
+}
+
+func (a *AuthService) VerifyTOTP(user *User, otp string) (bool, error) {
+	if user.State != ACTIVE {
+		// User is not active
+		return false, errors.New("User is not active")
+	}
+	valid := totp.Validate(otp, user.TotpSecret)
+	if valid {
+		return true, nil
+	}
+	valid = a.checkBackupCodes(user, otp)
+	return valid, nil
 }

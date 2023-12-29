@@ -13,6 +13,7 @@ type Config struct {
 	UserCollection  string `json:"user_collection"`
 	JWTSecret       string `json:"jwt_secret"`
 	TokenCollection string `json:"token_collection"`
+	TOTPIssuer      string `json:"totp_issuer"`
 }
 
 // Environment represents the environment (development, production, etc.).

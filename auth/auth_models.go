@@ -5,23 +5,29 @@ import (
 )
 
 type User struct {
+	Id              string    `bson:"_id,omitempty"`
 	Username        string    `bson:"username"`
 	Password        string    `bson:"password"`
 	OneTimePassword string    `bson:"oneTimePassword,omitempty"`
 	Role            string    `bson:"role"`
 	State           string    `bson:"state"`
 	Personnelnumber string    `bson:"personnelnumber,omitempty"`
+	TotpSecret      string    `bson:"totpSecret,omitempty"`
+	TotpActive      bool      `bson:"totpActive,omitempty"`
+	BackupCodes     []string  `bson:"backupCodes,omitempty"`
 	InsertedAt      time.Time `bson:"insertedAt"`
 	UpdatedAt       time.Time `bson:"updatedAt"`
 	ResetValidUntil time.Time `bson:"resetValidUntil,omitempty"`
 }
 
 type tokenModel struct {
-	UserId     string    `bson:"user_id"`
-	Token      string    `bson:"token"`
-	InsertedAt time.Time `bson:"insertedAt"`
-	UpdatedAt  time.Time `bson:"updatedAt"`
-	Expires    time.Time `bson:"expires"`
+	UserId         string    `bson:"user_id"`
+	Token          string    `bson:"token"`
+	Requires2FA    bool      `bson:"requires2FA,omitempty"`
+	TwoFAConfirmed bool      `bson:"TwoFAConfirmed,omitempty"`
+	InsertedAt     time.Time `bson:"insertedAt"`
+	UpdatedAt      time.Time `bson:"updatedAt"`
+	Expires        time.Time `bson:"expires"`
 }
 
 type loginReturn struct {
@@ -60,4 +66,8 @@ type DeleteOtherUserRequest struct {
 
 type ForgotPasswordRequest struct {
 	Username string `json:"username"`
+}
+
+type ActivateTOTPRequest struct {
+	TOTP string `json:"totp"`
 }

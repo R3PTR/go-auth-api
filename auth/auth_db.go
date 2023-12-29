@@ -3,10 +3,12 @@ package auth
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/R3PTR/go-auth-api/database"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type AuthDbService struct {
@@ -37,7 +39,11 @@ func (a *AuthDbService) GetUserbyUsername(username string) (*User, error) {
 // Get User by Id
 func (a *AuthDbService) GetUserbyId(id string) (*User, error) {
 	user := &User{}
-	err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).FindOne(context.Background(), bson.M{"_id": id}).Decode(user)
+	objectId, err := primitive.ObjectIDFromHex(id)
+	if err != nil {
+		log.Println("Invalid id")
+	}
+	err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).FindOne(context.Background(), bson.M{"_id": objectId}).Decode(user)
 	if err != nil {
 		// Handle errors, e.g., user not found
 		fmt.Println("Error:", err)
@@ -73,8 +79,17 @@ func (a *AuthDbService) WriteTokenToDatabase(userId, token string, expires time.
 }
 
 // Delete all tokens for a user
-func (a *AuthDbService) DeleteTokenByUsername(username string) error {
-	_, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.TokenCollection).DeleteMany(context.Background(), bson.M{"username": username})
+func (a *AuthDbService) DeleteTokensByUserId(userId string) error {
+	_, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.TokenCollection).DeleteMany(context.Background(), bson.M{"user_id": userId})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Delete all tokens for a user
+func (a *AuthDbService) DeleteTokenByUserId(userId, token string) error {
+	_, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.TokenCollection).DeleteOne(context.Background(), bson.M{"user_id": userId})
 	if err != nil {
 		return err
 	}
@@ -87,5 +102,17 @@ func (a *AuthDbService) DeleteUserByUsername(username string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Update User
+func (a *AuthDbService) UpdateUser(user *User) error {
+	// Delete Id from stuct, to prevent overwriting
+	user.Id = ""
+	result, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).ReplaceOne(context.Background(), bson.M{"username": user.Username}, user)
+	if err != nil {
+		return err
+	}
+	fmt.Println(result)
 	return nil
 }

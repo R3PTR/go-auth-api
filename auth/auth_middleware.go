@@ -15,16 +15,17 @@ import (
 type AuthMiddleware struct {
 	mongoClient   *database.MongoDBClient
 	AuthDbService *AuthDbService
+	AuthService   *AuthService
 }
 
-func NewMiddleware(mongoClient *database.MongoDBClient, authDbService *AuthDbService) *AuthMiddleware {
-	return &AuthMiddleware{mongoClient: mongoClient, AuthDbService: authDbService}
+func NewMiddleware(mongoClient *database.MongoDBClient, authDbService *AuthDbService, authService *AuthService) *AuthMiddleware {
+	return &AuthMiddleware{mongoClient: mongoClient, AuthDbService: authDbService, AuthService: authService}
 }
 
 func (AuthMiddleware *AuthMiddleware) AuthMiddleware(roleRequired []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
-		jwt_token, err := extractBearerToken(header)
+		jwt_token, err := ExtractToken(header)
 		if err != nil {
 			c.AbortWithStatusJSON(401, gin.H{"error": err.Error()})
 			return
@@ -49,19 +50,50 @@ func (AuthMiddleware *AuthMiddleware) AuthMiddleware(roleRequired []string) gin.
 			return
 		}
 		c.Set("user", user)
+		c.Set("token", token_model)
 		c.Next()
 	}
 }
 
-func extractBearerToken(header string) (string, error) {
+func (AuthMiddleware *AuthMiddleware) TOTPMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user_unasserted, exists := c.Get("user")
+		if !exists {
+			c.AbortWithStatusJSON(401, gin.H{"error": "User not found"})
+			return
+		}
+		user := user_unasserted.(*User)
+		if !user.TotpActive {
+			c.AbortWithStatusJSON(401, gin.H{"error": "TOTP not activated"})
+			return
+		}
+		totp := c.GetHeader("TOTP")
+		if totp == "" {
+			c.AbortWithStatusJSON(401, gin.H{"error": "TOTP not provided"})
+			return
+		}
+		correct, error := AuthMiddleware.AuthService.VerifyTOTP(user, totp)
+		if error != nil {
+			c.AbortWithStatusJSON(401, gin.H{"error": error.Error()})
+			return
+		}
+		if !correct {
+			c.AbortWithStatusJSON(401, gin.H{"error": "TOTP not valid"})
+			return
+		}
+		c.Next()
+	}
+}
+
+func ExtractToken(header string) (string, error) {
 	if header == "" {
 		return "", errors.New("bad header value given")
 	}
 
-	jwtToken := strings.Split(header, " ")
-	if len(jwtToken) != 2 {
+	token := strings.Split(header, " ")
+	if len(token) != 2 {
 		return "", errors.New("incorrectly formatted authorization header")
 	}
 
-	return jwtToken[1], nil
+	return token[1], nil
 }
