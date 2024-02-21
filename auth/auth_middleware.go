@@ -55,6 +55,29 @@ func (AuthMiddleware *AuthMiddleware) AuthMiddleware(roleRequired []string) gin.
 	}
 }
 
+// Middleware for Methods that require Password Check
+func (AuthMiddleware *AuthMiddleware) PasswordMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		user_unasserted, exists := c.Get("user")
+		if !exists {
+			c.AbortWithStatusJSON(401, gin.H{"error": "User not found"})
+			return
+		}
+		user := user_unasserted.(*User)
+		password := c.GetHeader("Password")
+		if password == "" {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Password not provided"})
+			return
+		}
+		err := AuthMiddleware.AuthService.VerifyPassword(user, password)
+		if err != nil {
+			c.AbortWithStatusJSON(401, gin.H{"error": err.Error()})
+			return
+		}
+		c.Next()
+	}
+}
+
 func (AuthMiddleware *AuthMiddleware) TOTPMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		user_unasserted, exists := c.Get("user")

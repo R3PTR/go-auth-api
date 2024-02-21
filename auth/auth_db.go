@@ -108,11 +108,49 @@ func (a *AuthDbService) DeleteUserByUsername(username string) error {
 // Update User
 func (a *AuthDbService) UpdateUser(user *User) error {
 	// Delete Id from stuct, to prevent overwriting
+	fmt.Println("Updating user")
+	user_id := user.Id
 	user.Id = ""
-	result, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).ReplaceOne(context.Background(), bson.M{"username": user.Username}, user)
+	objectId, err := primitive.ObjectIDFromHex(user_id)
+	if err != nil {
+		log.Println("Invalid id")
+	}
+	filter := bson.M{"_id": objectId}
+	result, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).ReplaceOne(context.Background(), filter, user)
 	if err != nil {
 		return err
 	}
-	fmt.Println(result)
-	return nil
+	if result.ModifiedCount != 0 {
+		return nil
+	}
+	result, err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).UpdateOne(context.Background(), bson.M{"_id": user_id}, bson.M{"$set": user})
+	if err != nil {
+		return err
+	}
+	if result.ModifiedCount != 0 {
+		return nil
+	}
+	return fmt.Errorf("something went wrong, user not updated")
+}
+
+// Get All Users
+func (a *AuthDbService) GetAllUsers() ([]UserOutputAll, error) {
+	var users []UserOutputAll
+	cursor, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).Find(context.Background(), bson.M{})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+	for cursor.Next(context.Background()) {
+		var user UserOutputAll
+		err := cursor.Decode(&user)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
 }

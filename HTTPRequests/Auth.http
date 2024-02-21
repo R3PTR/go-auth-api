@@ -5,7 +5,7 @@ POST http://localhost:9090/auth/createUser
 Content-Type: application/json
 Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDQyMjcxNjMsInVzZXJuYW1lIjoibGV2aW4uYmFja2VzIn0.X6P3sbppaae0fRyaCcsJxwh_ECN7tEh8f3WC17wwQ8rTtrR0voEj_fFeiNa3zQweude9sohVCLMCGFYi9za5zg
 {
-    "username": "levin.backes",
+    "username": "levin.backes@gmail.com",
     "role": "USER"
 }
 
@@ -112,7 +112,6 @@ Authorization: Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDYxODQ2M
 
 POST http://localhost:9090/auth/login
 Content-Type: application/json
-TOTP: 720373
 
 {
     "username": "levin.backes@gmail.com",

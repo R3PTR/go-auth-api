@@ -45,9 +45,9 @@ func NewAuthService(mongoClient *database.MongoDBClient, config *config.Config, 
 	return &AuthService{mongoClient: mongoClient, config: config, AuthDbService: authDbService, EmailSender: emailSender}
 }
 
-func (a *AuthService) CreateUser(username, role string) error {
+func (a *AuthService) CreateUser(username, role, personnelnumber string) error {
 	//Check if user exists
-	existingUser, err := a.AuthDbService.GetUserbyUsername(username)
+	existingUser, _ := a.AuthDbService.GetUserbyUsername(username)
 	if existingUser != nil {
 		return errors.New("User already exists")
 	}
@@ -59,10 +59,14 @@ func (a *AuthService) CreateUser(username, role string) error {
 	}
 	fmt.Println(password)
 	hashedPassword, err := HashPassword(password)
+	if err != nil {
+		log.Fatal(err)
+		return err
+	}
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
 	if err != nil {
 		fmt.Println(err)
-		return errors.New("Something went wrong hashing the password")
+		return errors.New("something went wrong hashing the password")
 	}
 	if err != nil {
 		log.Fatal(err)
@@ -74,16 +78,16 @@ func (a *AuthService) CreateUser(username, role string) error {
 		Password:        "",
 		OneTimePassword: hashedPassword,
 		Role:            role,
+		Personnelnumber: personnelnumber,
 		State:           NEW,
 		InsertedAt:      timestamp,
 		UpdatedAt:       timestamp,
 	}
 	err = a.AuthDbService.CreateUser(user)
 	if err != nil {
-		return errors.New("Something went wrong creating the user")
+		return errors.New("something went wrong creating the user")
 	}
-	// Send email
-	// TODO implement email sending
+	a.EmailSender.SendEmail(username, "New User", "Your new password is: "+password)
 	return nil
 }
 
@@ -111,7 +115,7 @@ func (a *AuthService) ActivateUser(user User, OneTimePassword, newPassword strin
 	err := bcrypt.CompareHashAndPassword([]byte(user.OneTimePassword), []byte(OneTimePassword))
 	if err != nil {
 		fmt.Println(err)
-		return errors.New("Username or Password incorrect")
+		return errors.New("username or Password incorrect")
 	}
 	// Hash newPassword
 	hashedPassword, err := HashPassword(newPassword)
@@ -123,7 +127,7 @@ func (a *AuthService) ActivateUser(user User, OneTimePassword, newPassword strin
 	err = bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(newPassword))
 	if err != nil {
 		fmt.Println(err)
-		return errors.New("Something went wrong hashing the password")
+		return errors.New("something went wrong hashing the password")
 	}
 	// Update user
 	filter := bson.M{"username": user.Username}
@@ -138,20 +142,14 @@ func (a *AuthService) ActivateUser(user User, OneTimePassword, newPassword strin
 	return nil
 }
 
-func (a *AuthService) ChangePassword(username, oldPassword, newPassword string) error {
+func (a *AuthService) ChangePassword(username, newPassword string) error {
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return errors.New("Username or Password incorrect")
+		return errors.New("username or Password incorrect")
 	}
 	if user.State != ACTIVE {
 		return errors.New("User is not active")
-	}
-	// Check if password is correct
-	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldPassword))
-	if err != nil {
-		fmt.Println(err)
-		return errors.New("Username and Password incorrect")
 	}
 	// Generate new password
 	hashedPassword, err := HashPassword(newPassword)
@@ -174,20 +172,14 @@ func (a *AuthService) ResetPassword(username, oneTimePassword, newPassword strin
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return errors.New("Username or Password incorrect")
+		return errors.New("username or Password incorrect")
 	}
 	if user.State != ACTIVE {
 		return errors.New("User is not active")
 	}
-	// Check if password is correct
-	err := bcrypt.CompareHashAndPassword([]byte(user.OneTimePassword), []byte(oneTimePassword))
-	if err != nil {
-		fmt.Println(err)
-		return errors.New("Username or Password incorrect")
-	}
 	// Check if resetValidUntil is still valid
 	if user.ResetValidUntil.Before(time.Now()) {
-		return errors.New("Reset password link is not valid anymore")
+		return errors.New("reset password link is not valid anymore")
 	}
 	// Generate new password
 	hashedPassword, err := HashPassword(newPassword)
@@ -210,7 +202,7 @@ func (a *AuthService) ForgotPassword(username string) error {
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return errors.New("Username or Password incorrect")
+		return errors.New("username or Password incorrect")
 	}
 	if user.State != ACTIVE {
 		return errors.New("User is not active")
@@ -245,7 +237,7 @@ func (a *AuthService) Login(username, password, totp string) (string, bool, erro
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return "", false, errors.New("Username or Password incorrect")
+		return "", false, errors.New("username or Password incorrect")
 	}
 	if user.State != ACTIVE {
 		// User is not active
@@ -255,12 +247,12 @@ func (a *AuthService) Login(username, password, totp string) (string, bool, erro
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
 	if err != nil {
 		fmt.Println(err)
-		return "", false, errors.New("Username or Password incorrect")
+		return "", false, errors.New("username or Password incorrect")
 	}
 	//Check if TOTP is active
 	if user.TotpActive {
 		if totp == "" {
-			return "", true, errors.New("No TOTP provided")
+			return "", true, errors.New("no TOTP provided")
 		}
 		// Check if TOTP is correct
 		valid, err := a.VerifyTOTP(user, totp)
@@ -289,7 +281,7 @@ func (a *AuthService) Logout(username, token string) error {
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return errors.New("Username or Password incorrect")
+		return errors.New("username or Password incorrect")
 	}
 	if user.State != ACTIVE {
 		// User is not active
@@ -349,6 +341,7 @@ func (a *AuthService) GetTOTP(user *User) (*otp.Key, []string, error) {
 	issuer := a.config.TOTPIssuer
 	key, err := generateTOTPKey(user.Username, issuer)
 	if err != nil {
+		return nil, nil, err
 	}
 	backupCodes, err := a.GenerateBackupCodes(user)
 	if err != nil {
@@ -454,4 +447,55 @@ func (a *AuthService) VerifyTOTP(user *User, otp string) (bool, error) {
 	}
 	valid = a.checkBackupCodes(user, otp)
 	return valid, nil
+}
+
+// Get All Users
+func (a *AuthService) GetAllUsers() ([]UserOutputAll, error) {
+	users, err := a.AuthDbService.GetAllUsers()
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// Get User By Username
+func (a *AuthService) GetUserByUsername(username string) (*User, error) {
+	user, err := a.AuthDbService.GetUserbyUsername(username)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+// Change Own Username
+func (a *AuthService) ChangeOwnUsername(user *User, newEmail string) error {
+	user.Username = newEmail
+	err := a.AuthDbService.UpdateUser(user)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Change Other Username
+func (a *AuthService) ChangeOtherUsername(username, newEmail string) error {
+	user, err := a.AuthDbService.GetUserbyUsername(username)
+	if err != nil {
+		return errors.New("username or Password incorrect")
+	}
+	user.Username = newEmail
+	err = a.AuthDbService.UpdateUser(user)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// VerifyPassword
+func (a *AuthService) VerifyPassword(user *User, password string) error {
+	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+	if err != nil {
+		return errors.New("username or Password incorrect")
+	}
+	return nil
 }

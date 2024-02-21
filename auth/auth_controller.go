@@ -42,7 +42,7 @@ func (ac *AuthController) CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	err := ac.authService.CreateUser(createUserRequest.Username, createUserRequest.Role)
+	err := ac.authService.CreateUser(createUserRequest.Username, createUserRequest.Role, createUserRequest.Personnelnumber)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -57,17 +57,12 @@ func (ac *AuthController) ActivateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	user_unasserted, exists := c.Get("user")
-	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+	user, err := ac.authService.GetUserByUsername(activeUserRequest.Username)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	user, err := user_unasserted.(User)
-	if !err {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
-		return
-	}
-	error := ac.authService.ActivateUser(user, activeUserRequest.OneTimePassword, activeUserRequest.NewPassword)
+	error := ac.authService.ActivateUser(*user, activeUserRequest.OneTimePassword, activeUserRequest.NewPassword)
 	if error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": error.Error()})
 		return
@@ -115,7 +110,7 @@ func (ac *AuthController) ChangePassword(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	error := ac.authService.ChangePassword(user.Username, changePasswordRequest.OldPassword, changePasswordRequest.NewPassword)
+	error := ac.authService.ChangePassword(user.Username, changePasswordRequest.NewPassword)
 	if error != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": error.Error()})
 		return
@@ -292,4 +287,69 @@ func (ac *AuthController) RegenerateBackupCodes(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"backup_codes": backupCodes})
+}
+
+// Get OwnUser
+func (ac *AuthController) GetOwnUser(c *gin.Context) {
+	user_unasserted, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	user, ok := user_unasserted.(*User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": user})
+}
+
+// Get All Users
+func (ac *AuthController) GetAllUsers(c *gin.Context) {
+	users, err := ac.authService.GetAllUsers()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"users": users})
+}
+
+// Change Own Username
+func (ac *AuthController) ChangeOwnUsername(c *gin.Context) {
+	var changeUsernameRequest ChangeUsernameRequest
+	if err := c.ShouldBindJSON(&changeUsernameRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	user_unasserted, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	user, ok := user_unasserted.(*User)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
+		return
+	}
+	err := ac.authService.ChangeOwnUsername(user, changeUsernameRequest.NewUsername)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Username changed successfully"})
+}
+
+// Change Other Username
+func (ac *AuthController) ChangeOtherUsername(c *gin.Context) {
+	var changeOtherUsernameRequest ChangeOtherUsernameRequest
+	if err := c.ShouldBindJSON(&changeOtherUsernameRequest); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	err := ac.authService.ChangeOtherUsername(changeOtherUsernameRequest.UsernameToChange, changeOtherUsernameRequest.NewUsername)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Username changed successfully"})
 }
