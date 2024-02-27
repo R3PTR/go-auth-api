@@ -1,6 +1,6 @@
 module github.com/R3PTR/go-auth-api
 
-go 1.21.4
+go 1.22.0
 
 require (
 	github.com/gin-contrib/cors v1.5.0

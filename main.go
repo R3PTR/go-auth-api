@@ -3,9 +3,6 @@ package main
 
 import (
 	"fmt"
-	"net/http"
-
-	"golang.org/x/crypto/bcrypt"
 
 	"github.com/R3PTR/go-auth-api/auth"
 	"github.com/R3PTR/go-auth-api/config"
@@ -40,33 +37,36 @@ func main() {
 	authMiddleware := auth.NewMiddleware(mongoClient, authDbService, authService)
 	// Create a new router
 	router := gin.Default()
-	router.Use(cors.Default())
-	testRouter := router.Group("/test").Use(authMiddleware.AuthMiddleware([]string{"ADMIN"}))
-	testRouter.GET("/Test", func(c *gin.Context) {
-		err := bcrypt.CompareHashAndPassword([]byte("$2a$10$rEieyUa4kUIl7CxRszYywuj7SoWXUqw9vofzZ66B1mKM8p3qEdYSS"), []byte("123456"))
-		if err != nil {
-			fmt.Println(err)
-		}
-		c.JSON(http.StatusOK, gin.H{"message": "Password is correct"})
-	})
+
+	// Cors Config
+	cors_config := cors.DefaultConfig()
+	cors_config.AllowOrigins = []string{"http://localhost:9000", "http://192.168.50.232:9000"}
+	cors_config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization", "Password", "Allow-Origin"}
+	cors_config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
+	cors_config.AllowCredentials = true
+	router.Use(cors.New(cors_config))
+
 	// Register the routes
 	authRouter := router.Group("/auth")
 	{
+		// GET Routes
+		authRouter.GET("/getOwnUser", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authController.GetOwnUser)
+		authRouter.GET("/getAllUsers", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER"}, []string{"LoginToken"}), authController.GetAllUsers)
+		// POST Routes
 		authRouter.POST("/login", authController.Login)
-		authRouter.POST("/createUser", authMiddleware.AuthMiddleware([]string{"ADMIN"}), authController.CreateUser)
-		authRouter.POST("/activateUser", authController.ActivateUser)
-		authRouter.POST("/resetPassword", authController.ResetPassword)
+		authRouter.POST("/logout", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authController.Logout)
+		authRouter.POST("/createUser", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), authController.CreateUser)
+		authRouter.POST("/deleteOtherUser", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), authController.DeleteOtherUser)
+		authRouter.POST("/activateUser", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"ActivationToken"}), authController.ActivateUser)
+		authRouter.POST("/resetPassword", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"ResetToken"}), authController.ResetPassword)
 		authRouter.POST("/forgotPassword", authController.ForgotPassword)
-		authRouter.POST("/changePassword", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authMiddleware.PasswordMiddleware(), authController.ChangePassword)
-		authRouter.POST("/changeOwnUsername", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authMiddleware.PasswordMiddleware(), authController.ChangeOwnUsername)
-		authRouter.POST("/changeOtherUsername", authMiddleware.AuthMiddleware([]string{"ADMIN"}), authMiddleware.PasswordMiddleware(), authController.ChangeOtherUsername)
-		authRouter.GET("/getOwnUser", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.GetOwnUser)
-		authRouter.GET("/getAllUsers", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER"}), authController.GetAllUsers)
-		authRouter.POST("/logout", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.Logout)
-		authRouter.POST("/getTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.GetTOTP)
-		authRouter.POST("/activateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authController.ActivateTOTP)
-		authRouter.POST("/deactivateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authMiddleware.TOTPMiddleware(), authController.DeactivateTOTP)
-		authRouter.POST("regenerateBackupCodes", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}), authMiddleware.TOTPMiddleware(), authController.RegenerateBackupCodes)
+		authRouter.POST("/changePassword", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authMiddleware.PasswordMiddleware(), authController.ChangePassword)
+		authRouter.POST("/updateOwnUser", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authController.UpdateOwnUser)
+		authRouter.POST("/updateOtherUser", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), authController.UpdateOtherUser)
+		authRouter.POST("/getTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authController.GetTOTP)
+		authRouter.POST("/activateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authController.ActivateTOTP)
+		authRouter.POST("/deactivateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authMiddleware.TOTPMiddleware(), authController.DeactivateTOTP)
+		authRouter.POST("regenerateBackupCodes", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authMiddleware.TOTPMiddleware(), authController.RegenerateBackupCodes)
 	}
 	router.Run(":9090")
 }

@@ -45,7 +45,7 @@ func NewAuthService(mongoClient *database.MongoDBClient, config *config.Config, 
 	return &AuthService{mongoClient: mongoClient, config: config, AuthDbService: authDbService, EmailSender: emailSender}
 }
 
-func (a *AuthService) CreateUser(username, role, personnelnumber string) error {
+func (a *AuthService) CreateUser(username, firstName, lastName, role, personnelnumber string) error {
 	//Check if user exists
 	existingUser, _ := a.AuthDbService.GetUserbyUsername(username)
 	if existingUser != nil {
@@ -75,6 +75,8 @@ func (a *AuthService) CreateUser(username, role, personnelnumber string) error {
 	timestamp := time.Now()
 	user := User{
 		Username:        username,
+		FirstName:       firstName,
+		LastName:        lastName,
 		Password:        "",
 		OneTimePassword: hashedPassword,
 		Role:            role,
@@ -91,31 +93,25 @@ func (a *AuthService) CreateUser(username, role, personnelnumber string) error {
 	return nil
 }
 
-func (a *AuthService) DeleteOwnUser(username string) error {
-	err := a.AuthDbService.DeleteUserByUsername(username)
+func (a *AuthService) DeleteOwnUser(userId string) error {
+	err := a.AuthDbService.DeleteUserById(userId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *AuthService) DeleteOtherUser(username string) error {
-	err := a.AuthDbService.DeleteUserByUsername(username)
+func (a *AuthService) DeleteOtherUser(userId string) error {
+	err := a.AuthDbService.DeleteUserById(userId)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *AuthService) ActivateUser(user User, OneTimePassword, newPassword string) error {
+func (a *AuthService) ActivateUser(user *User, newPassword string) error {
 	if user.State != NEW {
 		return errors.New("User is already activated")
-	}
-	// Check if password is correct
-	err := bcrypt.CompareHashAndPassword([]byte(user.OneTimePassword), []byte(OneTimePassword))
-	if err != nil {
-		fmt.Println(err)
-		return errors.New("username or Password incorrect")
 	}
 	// Hash newPassword
 	hashedPassword, err := HashPassword(newPassword)
@@ -164,22 +160,17 @@ func (a *AuthService) ChangePassword(username, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	a.AuthDbService.DeleteTokensByUserId(username)
+	a.AuthDbService.DeleteTokensByUserId(user.Id)
 	return nil
 }
 
-func (a *AuthService) ResetPassword(username, oneTimePassword, newPassword string) error {
-	// Check if user exists
-	user, error := a.AuthDbService.GetUserbyUsername(username)
-	if error != nil {
-		return errors.New("username or Password incorrect")
-	}
+func (a *AuthService) ResetPassword(user *User, newPassword string) error {
 	if user.State != ACTIVE {
 		return errors.New("User is not active")
 	}
 	// Check if resetValidUntil is still valid
 	if user.ResetValidUntil.Before(time.Now()) {
-		return errors.New("reset password link is not valid anymore")
+		return errors.New("reset password is not valid anymore")
 	}
 	// Generate new password
 	hashedPassword, err := HashPassword(newPassword)
@@ -188,13 +179,13 @@ func (a *AuthService) ResetPassword(username, oneTimePassword, newPassword strin
 		return err
 	}
 	// Update user
-	filter := bson.M{"username": username}
+	filter := bson.M{"username": user.Username}
 	update := bson.M{"$set": bson.M{"password": hashedPassword, "oneTimePassword": nil, "resetValidUntil": nil, "updatedAt": time.Now()}}
 	_, err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).UpdateOne(context.Background(), filter, update)
 	if err != nil {
 		return err
 	}
-	a.AuthDbService.DeleteTokensByUserId(username)
+	a.AuthDbService.DeleteTokensByUserId(user.Username)
 	return nil
 }
 
@@ -233,46 +224,57 @@ func (a *AuthService) ForgotPassword(username string) error {
 	return nil
 }
 
-func (a *AuthService) Login(username, password, totp string) (string, bool, error) {
+func (a *AuthService) Login(username, password, totp string) (*tokenModel, bool, error) {
 	// Check if user exists
 	user, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
-		return "", false, errors.New("username or Password incorrect")
+		return nil, false, errors.New("username or Password incorrect")
 	}
+	token_type := "LoginToken"
+	expires := time.Now().Add(time.Hour * 720)
 	if user.State != ACTIVE {
-		// User is not active
-		return "", false, errors.New("User is not active")
-	}
-	// Check if password is correct
-	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
-	if err != nil {
-		fmt.Println(err)
-		return "", false, errors.New("username or Password incorrect")
-	}
-	//Check if TOTP is active
-	if user.TotpActive {
-		if totp == "" {
-			return "", true, errors.New("no TOTP provided")
-		}
-		// Check if TOTP is correct
-		valid, err := a.VerifyTOTP(user, totp)
+		token_type = "ActivationToken"
+		expires = time.Now().Add(time.Minute * 15)
+		err := bcrypt.CompareHashAndPassword([]byte(user.OneTimePassword), []byte(password))
 		if err != nil {
-			return "", true, err
+			return nil, false, errors.New("username or Password incorrect")
 		}
-		if !valid {
-			return "", true, errors.New("TOTP is not valid")
+	} else {
+		// Check if password is correct
+		err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password))
+		if err != nil {
+			err = bcrypt.CompareHashAndPassword([]byte(user.OneTimePassword), []byte(password))
+			if err == nil {
+				token_type = "ResetToken"
+				expires = time.Now().Add(time.Minute * 15)
+			} else {
+				return nil, false, errors.New("username or Password incorrect")
+			}
+		}
+		//Check if TOTP is active
+		if user.TotpActive {
+			if totp == "" {
+				return nil, true, errors.New("no TOTP provided")
+			}
+			// Check if TOTP is correct
+			valid, err := a.VerifyTOTP(user, totp)
+			if err != nil {
+				return nil, true, err
+			}
+			if !valid {
+				return nil, true, errors.New("TOTP is not valid")
+			}
 		}
 	}
 	// Generate JWT
-	expires := time.Now().Add(time.Hour * 720)
-	token, err := a.generateJWTToken(username, expires.Unix())
+	token_string, err := a.generateJWTToken(username, user.Role, expires.Unix())
 	if err != nil {
-		return "", false, err
+		return nil, false, err
 	}
 	// Write token to database
-	err = a.AuthDbService.WriteTokenToDatabase(user.Id, token, expires)
+	token, err := a.AuthDbService.WriteTokenToDatabase(user.Id, token_string, token_type, expires)
 	if err != nil {
-		return "", false, err
+		return nil, false, err
 	}
 	return token, false, nil
 }
@@ -295,7 +297,7 @@ func (a *AuthService) Logout(username, token string) error {
 	return nil
 }
 
-func (a *AuthService) generateJWTToken(username string, expires int64) (string, error) {
+func (a *AuthService) generateJWTToken(username, role string, expires int64) (string, error) {
 	// Create a new token object, specifying signing method and the claims
 	// you would like it to contain.
 	token := jwt.New(jwt.SigningMethodHS512)
@@ -304,6 +306,7 @@ func (a *AuthService) generateJWTToken(username string, expires int64) (string, 
 	claims := token.Claims.(jwt.MapClaims)
 	claims["username"] = username
 	claims["exp"] = expires
+	claims["role"] = role
 
 	// Sign and get the complete encoded token as a string using the secret
 	return token.SignedString([]byte(a.config.JWTSecret))
@@ -467,23 +470,27 @@ func (a *AuthService) GetUserByUsername(username string) (*User, error) {
 	return user, nil
 }
 
-// Change Own Username
-func (a *AuthService) ChangeOwnUsername(user *User, newEmail string) error {
-	user.Username = newEmail
-	err := a.AuthDbService.UpdateUser(user)
+// Update User
+func (a *AuthService) UpdateUser(userId, username, firstName, lastName, role, personnelnumber string) error {
+	user, err := a.AuthDbService.GetUserbyId(userId)
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-// Change Other Username
-func (a *AuthService) ChangeOtherUsername(username, newEmail string) error {
-	user, err := a.AuthDbService.GetUserbyUsername(username)
-	if err != nil {
-		return errors.New("username or Password incorrect")
+	if username != "" {
+		user.Username = username
 	}
-	user.Username = newEmail
+	if firstName != "" {
+		user.FirstName = firstName
+	}
+	if lastName != "" {
+		user.LastName = lastName
+	}
+	if role != "" {
+		user.Role = role
+	}
+	if personnelnumber != "" {
+		user.Personnelnumber = personnelnumber
+	}
 	err = a.AuthDbService.UpdateUser(user)
 	if err != nil {
 		return err

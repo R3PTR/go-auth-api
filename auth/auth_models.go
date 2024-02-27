@@ -6,6 +6,8 @@ import (
 
 type User struct {
 	Id              string    `bson:"_id,omitempty"`
+	FirstName       string    `bson:"firstName"`
+	LastName        string    `bson:"lastName"`
 	Username        string    `bson:"username"`
 	Password        string    `bson:"password"`
 	OneTimePassword string    `bson:"oneTimePassword,omitempty"`
@@ -23,10 +25,11 @@ type User struct {
 type UserOutputAll struct {
 	Id              string    `bson:"_id,omitempty"`
 	Username        string    `bson:"username"`
+	FirstName       string    `bson:"firstName"`
+	LastName        string    `bson:"lastName"`
 	Role            string    `bson:"role"`
 	State           string    `bson:"state"`
 	Personnelnumber string    `bson:"personnelnumber,omitempty"`
-	TotpActive      bool      `bson:"totpActive,omitempty"`
 	InsertedAt      time.Time `bson:"insertedAt"`
 	UpdatedAt       time.Time `bson:"updatedAt"`
 }
@@ -36,6 +39,7 @@ type tokenModel struct {
 	Token          string    `bson:"token"`
 	Requires2FA    bool      `bson:"requires2FA,omitempty"`
 	TwoFAConfirmed bool      `bson:"TwoFAConfirmed,omitempty"`
+	TokenType      string    `bson:"tokenType"`
 	InsertedAt     time.Time `bson:"insertedAt"`
 	UpdatedAt      time.Time `bson:"updatedAt"`
 	Expires        time.Time `bson:"expires"`
@@ -43,6 +47,8 @@ type tokenModel struct {
 
 type CreateUserRequest struct {
 	Username        string `json:"username"`
+	FirstName       string `json:"firstName"`
+	LastName        string `json:"lastName"`
 	Role            string `json:"role"`
 	Personnelnumber string `json:"personnelnumber,omitempty"`
 }
@@ -53,14 +59,11 @@ type LoginRequest struct {
 }
 
 type ActivateUserRequest struct {
-	Username        string `json:"username"`
-	OneTimePassword string `json:"oneTimePassword"`
-	NewPassword     string `json:"newPassword"`
+	NewPassword string `json:"newPassword"`
 }
 
 type ResetPasswordRequest struct {
-	OneTimePassword string `json:"oneTimePassword"`
-	NewPassword     string `json:"newPassword"`
+	NewPassword string `json:"newPassword"`
 }
 
 type ChangePasswordRequest struct {
@@ -68,7 +71,7 @@ type ChangePasswordRequest struct {
 }
 
 type DeleteOtherUserRequest struct {
-	UsernameToDelete string `json:"usernameToDelete"`
+	UserId string `json:"id"`
 }
 
 type ForgotPasswordRequest struct {
@@ -79,12 +82,17 @@ type ActivateTOTPRequest struct {
 	TOTP string `json:"totp"`
 }
 
-type ChangeUsernameRequest struct {
-	NewUsername string `json:"newUsername"`
-	Password    string `json:"password"`
+type UpdateOtherUserRequest struct {
+	Id              string `json:"id,omitempty"`
+	Username        string `json:"username,omitempty"`
+	FirstName       string `json:"firstName,omitempty"`
+	LastName        string `json:"lastName,omitempty"`
+	Role            string `json:"role,omitempty"`
+	Personnelnumber string `json:"personnelnumber,omitempty"`
 }
 
-type ChangeOtherUsernameRequest struct {
-	UsernameToChange string `json:"usernameToChange"`
-	NewUsername      string `json:"newUsername"`
+type UpdateOwnUserRequest struct {
+	Username  string `json:"username,omitempty"`
+	FirstName string `json:"firstName,omitempty"`
+	LastName  string `json:"lastName,omitempty"`
 }

@@ -22,7 +22,7 @@ func NewMiddleware(mongoClient *database.MongoDBClient, authDbService *AuthDbSer
 	return &AuthMiddleware{mongoClient: mongoClient, AuthDbService: authDbService, AuthService: authService}
 }
 
-func (AuthMiddleware *AuthMiddleware) AuthMiddleware(roleRequired []string) gin.HandlerFunc {
+func (AuthMiddleware *AuthMiddleware) AuthMiddleware(roleRequired, tokenTypesAllowed []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		jwt_token, err := ExtractToken(header)
@@ -46,6 +46,10 @@ func (AuthMiddleware *AuthMiddleware) AuthMiddleware(roleRequired []string) gin.
 			return
 		}
 		if !slices.Contains(roleRequired, user.Role) {
+			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
+			return
+		}
+		if !slices.Contains(tokenTypesAllowed, token_model.TokenType) {
 			c.AbortWithStatusJSON(401, gin.H{"error": "Unauthorized"})
 			return
 		}

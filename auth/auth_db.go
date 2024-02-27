@@ -62,20 +62,21 @@ func (a *AuthDbService) GetTokenByToken(token string) (*tokenModel, error) {
 	return token_model, nil
 }
 
-func (a *AuthDbService) WriteTokenToDatabase(userId, token string, expires time.Time) error {
+func (a *AuthDbService) WriteTokenToDatabase(userId, token, tokenType string, expires time.Time) (*tokenModel, error) {
 	token_struct := tokenModel{
 		UserId:     userId,
 		Token:      token,
+		TokenType:  tokenType,
 		InsertedAt: time.Now(),
 		UpdatedAt:  time.Now(),
 		Expires:    expires,
 	}
 	insertResult, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.TokenCollection).InsertOne(context.Background(), token_struct)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	fmt.Println("Inserted a single document: ", insertResult.InsertedID)
-	return nil
+	return &token_struct, nil
 }
 
 // Delete all tokens for a user
@@ -97,8 +98,13 @@ func (a *AuthDbService) DeleteTokenByUserId(userId, token string) error {
 }
 
 // Delete User
-func (a *AuthDbService) DeleteUserByUsername(username string) error {
-	_, err := a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).DeleteMany(context.Background(), bson.M{"username": username})
+func (a *AuthDbService) DeleteUserById(userId string) error {
+	objectId, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		log.Println("Invalid id")
+	}
+	filter := bson.M{"_id": objectId}
+	_, err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).DeleteMany(context.Background(), filter)
 	if err != nil {
 		return err
 	}
@@ -109,9 +115,9 @@ func (a *AuthDbService) DeleteUserByUsername(username string) error {
 func (a *AuthDbService) UpdateUser(user *User) error {
 	// Delete Id from stuct, to prevent overwriting
 	fmt.Println("Updating user")
-	user_id := user.Id
+	userId := user.Id
 	user.Id = ""
-	objectId, err := primitive.ObjectIDFromHex(user_id)
+	objectId, err := primitive.ObjectIDFromHex(userId)
 	if err != nil {
 		log.Println("Invalid id")
 	}
@@ -123,7 +129,7 @@ func (a *AuthDbService) UpdateUser(user *User) error {
 	if result.ModifiedCount != 0 {
 		return nil
 	}
-	result, err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).UpdateOne(context.Background(), bson.M{"_id": user_id}, bson.M{"$set": user})
+	result, err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).UpdateOne(context.Background(), filter, bson.M{"$set": user})
 	if err != nil {
 		return err
 	}
