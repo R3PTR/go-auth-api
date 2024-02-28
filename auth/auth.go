@@ -45,9 +45,9 @@ func NewAuthService(mongoClient *database.MongoDBClient, config *config.Config, 
 	return &AuthService{mongoClient: mongoClient, config: config, AuthDbService: authDbService, EmailSender: emailSender}
 }
 
-func (a *AuthService) CreateUser(username, firstName, lastName, role, personnelnumber string) error {
+func (a *AuthService) CreateUser(createUserRequest CreateUserRequest) error {
 	//Check if user exists
-	existingUser, _ := a.AuthDbService.GetUserbyUsername(username)
+	existingUser, _ := a.AuthDbService.GetUserbyUsername(createUserRequest.Username)
 	if existingUser != nil {
 		return errors.New("User already exists")
 	}
@@ -74,22 +74,25 @@ func (a *AuthService) CreateUser(username, firstName, lastName, role, personneln
 	}
 	timestamp := time.Now()
 	user := User{
-		Username:        username,
-		FirstName:       firstName,
-		LastName:        lastName,
-		Password:        "",
-		OneTimePassword: hashedPassword,
-		Role:            role,
-		Personnelnumber: personnelnumber,
-		State:           NEW,
-		InsertedAt:      timestamp,
-		UpdatedAt:       timestamp,
+		Username:            createUserRequest.Username,
+		FirstName:           createUserRequest.FirstName,
+		LastName:            createUserRequest.LastName,
+		Password:            "",
+		OneTimePassword:     hashedPassword,
+		Role:                createUserRequest.Role,
+		Personnelnumber:     createUserRequest.Personnelnumber,
+		VacationDaysPerYear: createUserRequest.VacationDaysPerYear,
+		TargetHoursPerWeek:  createUserRequest.TargetHoursPerWeek,
+		MaximumHoursPerWeek: createUserRequest.MaximumHoursPerWeek,
+		State:               NEW,
+		InsertedAt:          timestamp,
+		UpdatedAt:           timestamp,
 	}
 	err = a.AuthDbService.CreateUser(user)
 	if err != nil {
 		return errors.New("something went wrong creating the user")
 	}
-	a.EmailSender.SendEmail(username, "New User", "Your new password is: "+password)
+	a.EmailSender.SendEmail(user.Username, "New User", "Your new password is: "+password)
 	return nil
 }
 
@@ -471,7 +474,7 @@ func (a *AuthService) GetUserByUsername(username string) (*User, error) {
 }
 
 // Update User
-func (a *AuthService) UpdateUser(userId, username, firstName, lastName, role, personnelnumber string) error {
+func (a *AuthService) UpdateUser(userId, username, firstName, lastName, role, personnelnumber string, vacationDaysPerYear int, targetHoursPerWeek, maximumHoursPerWeek float32) error {
 	user, err := a.AuthDbService.GetUserbyId(userId)
 	if err != nil {
 		return err
@@ -490,6 +493,15 @@ func (a *AuthService) UpdateUser(userId, username, firstName, lastName, role, pe
 	}
 	if personnelnumber != "" {
 		user.Personnelnumber = personnelnumber
+	}
+	if vacationDaysPerYear != 0 {
+		user.VacationDaysPerYear = vacationDaysPerYear
+	}
+	if targetHoursPerWeek != 0 {
+		user.TargetHoursPerWeek = targetHoursPerWeek
+	}
+	if maximumHoursPerWeek != 0 {
+		user.MaximumHoursPerWeek = maximumHoursPerWeek
 	}
 	err = a.AuthDbService.UpdateUser(user)
 	if err != nil {

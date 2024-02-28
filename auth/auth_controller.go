@@ -42,7 +42,7 @@ func (ac *AuthController) CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	err := ac.authService.CreateUser(createUserRequest.Username, createUserRequest.FirstName, createUserRequest.LastName, createUserRequest.Role, createUserRequest.Personnelnumber)
+	err := ac.authService.CreateUser(createUserRequest)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -336,7 +336,7 @@ func (ac *AuthController) UpdateOwnUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	err := ac.authService.UpdateUser(user.Id, updateOwnUserRequest.Username, updateOwnUserRequest.FirstName, updateOwnUserRequest.LastName, "", "")
+	err := ac.authService.UpdateUser(user.Id, updateOwnUserRequest.Username, updateOwnUserRequest.FirstName, updateOwnUserRequest.LastName, "", "", 0, 0, 0)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -351,7 +351,7 @@ func (ac *AuthController) UpdateOtherUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	err := ac.authService.UpdateUser(updateOtherUserRequest.Id, updateOtherUserRequest.Username, updateOtherUserRequest.FirstName, updateOtherUserRequest.LastName, updateOtherUserRequest.Role, updateOtherUserRequest.Personnelnumber)
+	err := ac.authService.UpdateUser(updateOtherUserRequest.Id, updateOtherUserRequest.Username, updateOtherUserRequest.FirstName, updateOtherUserRequest.LastName, updateOtherUserRequest.Role, updateOtherUserRequest.Personnelnumber, updateOtherUserRequest.VacationDaysPerYear, updateOtherUserRequest.TargetHoursPerWeek, updateOtherUserRequest.MaximumHoursPerWeek)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
