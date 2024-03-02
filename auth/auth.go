@@ -518,3 +518,12 @@ func (a *AuthService) VerifyPassword(user *User, password string) error {
 	}
 	return nil
 }
+
+// GetOwnUser
+func (a *AuthService) GetOwnUser(userId string) (*UserOutput, error) {
+	user, err := a.AuthDbService.GetOwnUser(userId)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}

@@ -26,18 +26,30 @@ type User struct {
 }
 
 type UserOutputAll struct {
-	Id                  string    `bson:"_id,omitempty"`
-	Username            string    `bson:"username"`
-	FirstName           string    `bson:"firstName"`
-	LastName            string    `bson:"lastName"`
-	Role                string    `bson:"role"`
-	State               string    `bson:"state"`
-	Personnelnumber     string    `bson:"personnelnumber,omitempty"`
-	VacationDaysPerYear int       `bson:"vacationDaysPerYear"`
-	TargetHoursPerWeek  float32   `bson:"targetHoursPerWeek"`
-	MaximumHoursPerWeek float32   `bson:"MaximumHoursPerWeek,omitempty"`
-	InsertedAt          time.Time `bson:"insertedAt"`
-	UpdatedAt           time.Time `bson:"updatedAt"`
+	Id                  string  `bson:"_id,omitempty"`
+	Username            string  `bson:"username"`
+	FirstName           string  `bson:"firstName"`
+	LastName            string  `bson:"lastName"`
+	Role                string  `bson:"role"`
+	State               string  `bson:"state"`
+	Personnelnumber     string  `bson:"personnelnumber,omitempty"`
+	VacationDaysPerYear int     `bson:"vacationDaysPerYear"`
+	TargetHoursPerWeek  float32 `bson:"targetHoursPerWeek"`
+	MaximumHoursPerWeek float32 `bson:"MaximumHoursPerWeek,omitempty"`
+}
+
+type UserOutput struct {
+	Id                  string  `bson:"_id,omitempty"`
+	Username            string  `bson:"username"`
+	FirstName           string  `bson:"firstName"`
+	LastName            string  `bson:"lastName"`
+	Role                string  `bson:"role"`
+	State               string  `bson:"state"`
+	Personnelnumber     string  `bson:"personnelnumber,omitempty"`
+	VacationDaysPerYear int     `bson:"vacationDaysPerYear"`
+	TargetHoursPerWeek  float32 `bson:"targetHoursPerWeek"`
+	MaximumHoursPerWeek float32 `bson:"MaximumHoursPerWeek,omitempty"`
+	TotpActive          bool    `bson:"totpActive,omitempty"`
 }
 
 type tokenModel struct {

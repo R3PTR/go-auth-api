@@ -160,3 +160,19 @@ func (a *AuthDbService) GetAllUsers() ([]UserOutputAll, error) {
 	}
 	return users, nil
 }
+
+// GetOwnUser
+func (a *AuthDbService) GetOwnUser(userId string) (*UserOutput, error) {
+	user := &UserOutput{}
+	objectId, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		log.Println("Invalid id")
+	}
+	err = a.mongoClient.GetCollection(a.mongoClient.Config.UserDatabase, a.mongoClient.Config.UserCollection).FindOne(context.Background(), bson.M{"_id": objectId}).Decode(user)
+	if err != nil {
+		// Handle errors, e.g., user not found
+		fmt.Println("Error:", err)
+		return nil, err
+	}
+	return user, nil
+}

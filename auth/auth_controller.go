@@ -306,7 +306,12 @@ func (ac *AuthController) GetOwnUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"user": user})
+	userOutput, err := ac.authService.GetOwnUser(user.Id)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"user": userOutput})
 }
 
 // Get All Users
