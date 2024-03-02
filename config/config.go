@@ -14,7 +14,7 @@ type Config struct {
 	SiteDatabase        string `json:"site_database"`
 	SiteCollection      string `json:"site_collection"`
 	WorkspaceCollection string `json:"workspace_collection"`
-	AbsenceCollection   string `json:"absence_collection"`
+	AbsenceCollection   string `json:"absences_collection"`
 	AbsencesDatabase    string `json:"absences_database"`
 	JWTSecret           string `json:"jwt_secret"`
 	TokenCollection     string `json:"token_collection"`
