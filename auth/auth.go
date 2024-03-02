@@ -194,12 +194,9 @@ func (a *AuthService) ResetPassword(user *User, newPassword string) error {
 
 func (a *AuthService) ForgotPassword(username string) error {
 	// Check if user exists
-	user, error := a.AuthDbService.GetUserbyUsername(username)
+	_, error := a.AuthDbService.GetUserbyUsername(username)
 	if error != nil {
 		return errors.New("username or Password incorrect")
-	}
-	if user.State != ACTIVE {
-		return errors.New("User is not active")
 	}
 	// Generate random password
 	password, err := generateRandomPassword(8)
@@ -223,7 +220,10 @@ func (a *AuthService) ForgotPassword(username string) error {
 	if err != nil {
 		return err
 	}
-	a.EmailSender.SendEmail(username, "Forgot Password", "Your new password is: "+password)
+	err = a.EmailSender.SendEmail(username, "Forgot Password", "Your new password is: "+password)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

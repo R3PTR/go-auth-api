@@ -8,12 +8,15 @@ import (
 
 // Config represents the MongoDB configuration.
 type Config struct {
-	MongoDBURI      string `json:"mongodb_uri"`
-	UserDatabase    string `json:"user_database"`
-	UserCollection  string `json:"user_collection"`
-	JWTSecret       string `json:"jwt_secret"`
-	TokenCollection string `json:"token_collection"`
-	TOTPIssuer      string `json:"totp_issuer"`
+	MongoDBURI          string `json:"mongodb_uri"`
+	UserDatabase        string `json:"user_database"`
+	UserCollection      string `json:"user_collection"`
+	SiteDatabase        string `json:"site_database"`
+	SiteCollection      string `json:"site_collection"`
+	WorkspaceCollection string `json:"workspace_collection"`
+	JWTSecret           string `json:"jwt_secret"`
+	TokenCollection     string `json:"token_collection"`
+	TOTPIssuer          string `json:"totp_issuer"`
 }
 
 // Environment represents the environment (development, production, etc.).
