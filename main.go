@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/R3PTR/go-auth-api/absences"
 	"github.com/R3PTR/go-auth-api/auth"
 	"github.com/R3PTR/go-auth-api/config"
 	"github.com/R3PTR/go-auth-api/database"
@@ -38,10 +39,15 @@ func main() {
 	authMiddleware := auth.NewMiddleware(mongoClient, authDbService, authService)
 	// Create a new router
 
-	// Create SiteDbService
+	// Create SiteServices
 	siteDbService := sites.NewSitesDbService(mongoClient)
 	siteService := sites.NewSiteService(siteDbService)
 	siteController := sites.NewSiteController(siteService)
+
+	// Create AbsencesServices
+	absencesDbService := absences.NewAbsencesDbService(mongoClient)
+	absencesService := absences.NewAbsencesService(absencesDbService)
+	absencesController := absences.NewAbsencesController(absencesService)
 
 	router := gin.Default()
 
@@ -74,6 +80,8 @@ func main() {
 		//authRouter.POST("/deactivateTOTP", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authMiddleware.TOTPMiddleware(), authController.DeactivateTOTP)
 		//authRouter.POST("regenerateBackupCodes", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), authMiddleware.TOTPMiddleware(), authController.RegenerateBackupCodes)
 	}
+
+	// Sites Routes
 	siteRouter := router.Group("/sites")
 	{
 		// GET Routes
@@ -89,5 +97,23 @@ func main() {
 		siteRouter.DELETE("/deleteSite/:id", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), siteController.DeleteSite)
 		siteRouter.DELETE("/deleteWorkspace/:id", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), siteController.DeleteWorkspace)
 	}
+	// Absences Routes
+	absencesRouter := router.Group("/absences")
+	{
+		// GET Routes
+		absencesRouter.GET("/getAbsences", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), absencesController.GetAllAbsences)
+		absencesRouter.GET("/getOwnAbsences", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), absencesController.GetAbsences)
+
+		// POST Routes
+		absencesRouter.POST("/createAbsence", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), absencesController.CreateAbsence)
+
+		// PUT Routes
+		absencesRouter.PUT("/updateOwnAbsence", authMiddleware.AuthMiddleware([]string{"ADMIN", "USER", "DRIVER"}, []string{"LoginToken"}), absencesController.UpdateOwnAbsence)
+		absencesRouter.PUT("/updateAbsenceAsAdmin", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), absencesController.UpdateAbsenceAsAdmin)
+
+		// DELETE Routes
+		absencesRouter.DELETE("/deleteAbsence/:id", authMiddleware.AuthMiddleware([]string{"ADMIN"}, []string{"LoginToken"}), absencesController.DeleteAbsence)
+	}
+
 	router.Run(":9090")
 }

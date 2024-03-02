@@ -7,5 +7,7 @@
     "totp_issuer": "TE_Autoteile",
     "site_collection": "sites",
     "site_database": "development_db",
+    "vacations_database": "development_db",
+    "vacations_collection": "vacations",
     "workspace_collection": "workspaces"
 }
