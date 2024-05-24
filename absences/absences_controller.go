@@ -42,7 +42,7 @@ func (a *AbsencesController) GetAbsences(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, absences)
+	c.JSON(http.StatusOK, gin.H{"absences": absences})
 }
 
 // CreateAbsence

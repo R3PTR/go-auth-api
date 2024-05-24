@@ -82,8 +82,8 @@ func (a *AbsencesDbService) CreateAbsence(newAbsence newAbsence, userId string) 
 	absence := Absence{
 		TypeOfAbsence: newAbsence.TypeOfAbsence,
 		UserId:        userId,
-		StartDate:     newAbsence.StartDate,
-		EndDate:       newAbsence.EndDate,
+		DateRange:     newAbsence.DateRange,
+		TotalDays:     newAbsence.TotalDays,
 		Reason:        newAbsence.Reason,
 		Status:        "pending",
 	}
@@ -100,7 +100,8 @@ func (a *AbsencesDbService) UpdateOwnAbsence(updateOwnAbsence UpdateOwnAbsence) 
 	if err != nil {
 		return err
 	}
-	_, err = a.getAbsenceCollection().UpdateOne(context.Background(), bson.M{"_id": objectId}, bson.M{"$set": bson.M{"startDate": updateOwnAbsence.StartDate, "endDate": updateOwnAbsence.EndDate, "reason": updateOwnAbsence.Reason}})
+	updateOwnAbsence.Id = ""
+	_, err = a.getAbsenceCollection().UpdateOne(context.Background(), bson.M{"_id": objectId}, bson.M{"$set": updateOwnAbsence})
 	if err != nil {
 		return err
 	}
